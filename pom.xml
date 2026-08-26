@@ -22,7 +22,7 @@
 	<!-- Project Identity Details -->
 	<groupId>com.ai</groupId>
 
-	<artifactId>poc</artifactId>
+	<artifactId>AiEnabledAccessRightRecertificationService</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>poc</name>
 	<description>Spring Boot AI POC with Kafka and PGVector</description>
