@@ -1,0 +1,233 @@
+services:
+  # ==============================================================================
+  # 1. Apache Kafka (Message Broker - Kraft Mode)
+  # Acts as the central nervous system. Receives database changes from Debezium
+  # and serves them to your Spring Boot application.
+  # ==============================================================================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: springboot-ai-poc-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # Unique integer ID for this broker in the KRaft cluster
+      KAFKA_NODE_ID: 1
+
+      # Defines node roles in KRaft mode (acts as both message broker and metadata controller)
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+
+      # Interfaces and ports the Kafka broker binds to internally
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+
+      # Addresses that external clients and containers use to reach Kafka
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+
+      # Controller quorum mapping for metadata management in KRaft mode
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+
+      # Listener names designation
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+
+      # File system directory for Kafka logs
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+
+      # Unique cluster identifier required to initialize KRaft mode
+      CLUSTER_ID: 'Mk3OEYBSD3Tsfw5VVVTheA=='
+
+      # --- Single-Node Overrides (Prevents replication/quorum hanging) ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/29092'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - springboot-ai-poc-application-network
+
+  # ==============================================================================
+  # 2. Kafka Registry
+  # An application to register schema type of the Kafka message (Avro or Protobuf)
+  # ==============================================================================
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: springboot-ai-poc-schema-registry
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      # Updated to use Kafka's internal Docker listener port (29092) instead of 9092
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:29092'
+    depends_on:
+      kafka:
+        condition: service_healthy # Ensures Schema Registry waits until Kafka is fully healthy before starting
+    networks:
+      - springboot-ai-poc-application-network
+
+  # ==============================================================================
+  # 2. Kafka UI (Observability Dashboard)
+  # A web interface to view Kafka topics, messages, and consumer groups.
+  # ==============================================================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: springboot-ai-poc-kafka-ui
+    ports:
+      - "8090:8080" # Access via http://localhost:8090
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      KAFKA_CLUSTERS_0_NAME: 'local'
+      # Connects to Kafka using the internal Docker network listener (29092)
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 'kafka:29092'
+    depends_on:
+      - kafka
+    networks:
+      - springboot-ai-poc-application-network
+
+  # ==============================================================================
+  # 3. Debezium Kafka Connect (Change Data Capture)
+  # Monitors PostgreSQL for row-level changes (INSERT, UPDATE, DELETE) and
+  # streams those changes instantly as JSON events into Kafka topics.
+  # ==============================================================================
+  debezium-connect:
+    build: .
+    container_name: springboot-ai-poc-debezium-connect
+    hostname: kafka-connect
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: 'kafka:29092'
+      CONNECT_REST_ADVERTISED_HOST_NAME: 'kafka-connect'
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: 'debezium-cluster'
+      CONNECT_CONFIG_STORAGE_TOPIC: 'connect-configs'
+      CONNECT_OFFSET_STORAGE_TOPIC: 'connect-offsets'
+      CONNECT_STATUS_STORAGE_TOPIC: 'connect-status'
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: '1'
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: '1'
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: '1'
+
+      # Avro Converters with Schema Registry
+      CONNECT_KEY_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+      CONNECT_VALUE_CONVERTER: 'io.confluent.connect.avro.AvroConverter'
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+
+      CONNECT_PLUGIN_PATH: "/usr/share/java"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      schema-registry:
+        condition: service_started
+    networks:
+      - springboot-ai-poc-application-network
+
+  # ==============================================================================
+  # 4. PostgreSQL (Relational Data + Vector Store)
+  # Houses both your traditional IAM schema (Source of Truth) and
+  # the pgvector schema (AI Knowledge base for PDF chunks).
+  # ==============================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: springboot-ai-poc-postgres-vector-db
+    hostname: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: vectordb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    # CRITICAL FOR CDC: wal_level=logical tells Postgres to write
+    # detailed transaction logs so Debezium can read them.
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=4"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data # Persists database data across container restarts
+    networks:
+      - springboot-ai-poc-application-network
+
+  # ==============================================================================
+  # 5. pgAdmin (Database Dashboard)
+  # Web UI to execute SQL scripts, view tables, and manage PostgreSQL schemas.
+  # ==============================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: springboot-ai-poc-pgadmin-for-postgres-sql
+    ports:
+      - "5050:80" # Access via http://localhost:5050
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: adminpassword123
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - springboot-ai-poc-application-network
+
+  # ==============================================================================
+  # 6. Ollama (Local AI Engine)
+  # Hosts your Large Language Models (e.g., Llama3) and
+  # Embedding models (e.g., nomic-embed-text) entirely locally.
+  # ==============================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: springboot-ai-poc-ollama
+    ports:
+      - "11434:11434" # API port used by Spring AI to send prompts to the LLM
+    volumes:
+      - ollama_data:/root/.ollama # Persists downloaded LLM models so you don't re-download them
+    networks:
+      - springboot-ai-poc-application-network
+
+  # ==============================================================================
+  # 7. Open WebUI (Chat Interface for Ollama)
+  # A ChatGPT-like browser interface to chat with your local models manually.
+  # ==============================================================================
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: springboot-ai-poc-open-webui-for-ollama
+    ports:
+      - "3000:8080" # Access via http://localhost:3000
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434 # Points WebUI to the Ollama container
+    volumes:
+      - open-webui_data:/app/backend/data
+    depends_on:
+      - ollama
+    networks:
+      - springboot-ai-poc-application-network
+
+volumes:
+  pgdata:
+  pgadmin_data:
+  ollama_data:
+  open-webui_data:
+
+networks:
+  springboot-ai-poc-application-network:
+    driver: bridge # Default bridge network so containers can resolve each other by hostname
+
+# Llama 3 is just a raw model—not an executable application with its own Docker image.
+# Ollama acts as the runtime engine that allows us to pull, run, and interact with the llm models. hence we can not pull/execute llama3 using docker/docker compose
+# It is ollama which pulls and executes LLMs hence no llama3 image available for docker
+
+# So EITHER USE following command to run ollama and ollama pull llama3.2:1b (ultra light weight llm)
+# docker exec -it springboot-ai-poc-ollama ollama pull llama3.2:1b
+
+                  # OR
+
+# Fully Automated via Open WebUI (Alternative)
+#If you don't want to use your terminal to pull models at all:
+#
+#Start your Docker Compose stack normally.
+#
+#Open your browser and go to http://localhost:3000 (Open WebUI).
+#
+#Log in, go to Admin Settings > Models, type llama3 into the download input box, and click Download. The web interface will pull the model directly into Docker for you without touching the terminal.

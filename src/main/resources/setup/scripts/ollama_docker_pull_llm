@@ -1,0 +1,3 @@
+docker exec -it springboot-ai-poc-ollama ollama pull llama3.2:1b
+
+docker exec -it springboot-ai-poc-ollama ollama pull nomic-embed-text

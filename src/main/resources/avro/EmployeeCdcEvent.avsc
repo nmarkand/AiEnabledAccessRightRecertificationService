@@ -1,0 +1,34 @@
+{
+  "type": "record",
+  "name": "EmployeeCdcEvent",
+  "namespace": "com.ai.poc.kafka.dto",
+  "fields": [
+    {
+      "name": "before",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "EmployeeRecord",
+          "fields": [
+            { "name": "employee_id", "type": "string" },
+            { "name": "full_name", "type": ["null", "string"], "default": null },
+            { "name": "department", "type": ["null", "string"], "default": null },
+            { "name": "job_title", "type": ["null", "string"], "default": null },
+            { "name": "is_active", "type": ["null", "boolean"], "default": null }
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "after",
+      "type": ["null", "EmployeeRecord"],
+      "default": null
+    },
+    {
+      "name": "op",
+      "type": "string"
+    }
+  ]
+}

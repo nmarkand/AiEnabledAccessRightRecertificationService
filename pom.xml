@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<!-- Defines the version of the Maven Project Object Model (POM) being used -->
+	<modelVersion>4.0.0</modelVersion>
+
+	<!-- ==================================================================== -->
+	<!-- PARENT POM                                                           -->
+	<!-- Significance: The "Starter Parent" acts as the foundation of your    -->
+	<!-- Spring Boot application. It provides default configurations, Maven   -->
+	<!-- plugin setups, and dependency management. Because of this, you don't -->
+	<!-- have to specify versions for standard Spring/Java libraries below.   -->
+	<!-- ==================================================================== -->
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.0</version>
+		<relativePath/>
+	</parent>
+
+	<!-- Project Identity Details -->
+	<groupId>com.ai</groupId>
+
+	<artifactId>poc</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>poc</name>
+	<description>Spring Boot AI POC with Kafka and PGVector</description>
+
+	<!-- ==================================================================== -->
+	<!-- PROPERTIES                                                           -->
+	<!-- Significance: Centralized variables for version numbers. This makes  -->
+	<!-- it easy to upgrade libraries (like Avro or Spring AI) in one place   -->
+	<!-- without hunting through the entire file.                             -->
+	<!-- ==================================================================== -->
+	<properties>
+		<java.version>21</java.version>
+		<spring-ai.version>2.0.0</spring-ai.version>
+		<confluent.version>7.5.0</confluent.version>
+		<avro.version>1.11.3</avro.version>
+	</properties>
+
+	<!-- ==================================================================== -->
+	<!-- REPOSITORIES                                                         -->
+	<!-- Significance: Maven usually downloads libraries from "Maven Central".-->
+	<!-- However, Confluent (the creators of Schema Registry) host their      -->
+	<!-- specific Avro libraries on their own private repository. This block  -->
+	<!-- tells Maven where to find the 'kafka-avro-serializer' dependency.    -->
+	<!-- ==================================================================== -->
+	<repositories>
+		<repository>
+			<id>confluent</id>
+			<url>https://packages.confluent.io/maven/</url>
+		</repository>
+		<repository>
+			<id>spring-milestones</id>
+			<name>Spring Milestones</name>
+			<url>https://repo.spring.io/milestone</url>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>spring-snapshots</id>
+			<name>Spring Snapshots</name>
+			<url>https://repo.spring.io/snapshot</url>
+			<releases>
+				<enabled>false</enabled>
+			</releases>
+		</repository>
+</repositories>
+
+	<!-- ==================================================================== -->
+	<!-- DEPENDENCY MANAGEMENT (BOM - Bill of Materials)                      -->
+	<!-- Significance: Spring AI has many sub-modules (ollama, pgvector, etc).-->
+	<!-- Importing the BOM guarantees that all Spring AI dependencies you add -->
+	<!-- below will use mutually compatible versions, preventing conflicts.   -->
+	<!-- ==================================================================== -->
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.ai</groupId>
+				<artifactId>spring-ai-bom</artifactId>
+				<version>${spring-ai.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<dependencies>
+		<!-- ================================================================= -->
+		<!-- CORE SPRING BOOT DEPENDENCIES                                     -->
+		<!-- ================================================================= -->
+
+		<!-- Significance: The core engine of Spring Boot. Provides auto-configuration, logging, and YAML parsing. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter</artifactId>
+		</dependency>
+
+		<!-- Significance: Embeds a Tomcat web server and provides Spring MVC. You need this to expose REST APIs like your AuditController. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<!-- ================================================================= -->
+		<!-- DATABASE & PERSISTENCE                                            -->
+		<!-- ================================================================= -->
+
+		<!-- Significance: Provides Hibernate and Spring Data JPA. Allows you to write simple interfaces (like EmployeeRepository) to query data without writing raw SQL. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+
+		<!-- Significance: The actual PostgreSQL JDBC driver. It translates Java database commands into the specific network protocol PostgreSQL understands. -->
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- ================================================================= -->
+		<!-- KAFKA & AVRO STREAMING                                            -->
+		<!-- ================================================================= -->
+
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka</artifactId>
+		</dependency>
+		<!-- Significance: Connects your app to Kafka. Provides the @KafkaListener annotation to consume Debezium CDC events. -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
+		<!-- Significance: Confluent's library that talks to the Schema Registry. It intercepts incoming binary from Kafka, fetches the schema, and helps decode it. -->
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-avro-serializer</artifactId>
+			<version>${confluent.version}</version>
+		</dependency>
+
+		<!-- Significance: The core Apache Avro library. Provides the underlying data structures and binary manipulation logic needed by Confluent. -->
+		<dependency>
+			<groupId>org.apache.avro</groupId>
+			<artifactId>avro</artifactId>
+			<version>${avro.version}</version>
+		</dependency>
+
+		<!-- ================================================================= -->
+		<!-- SPRING AI (ARTIFICIAL INTELLIGENCE)                               -->
+		<!-- ================================================================= -->
+
+		<!-- Significance: Connects your Spring app to local LLMs running via Ollama. This powers the 'brain' of your OrchestratorAgent. -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-ollama</artifactId>
+		</dependency>
+
+		<!-- Significance: Allows Spring AI to use your existing PostgreSQL database (via the pgvector extension) as a Vector Database for semantic search (RAG). -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-vector-store-advisor</artifactId>
+			<version>${spring-ai.version}</version>
+		</dependency>
+
+		<!-- Significance: A utility that allows Spring AI to read, parse, and chunk PDF files (like your company compliance policies) so they can be saved into the vector store. -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-pdf-document-reader</artifactId>
+		</dependency>
+
+		<!-- ================================================================= -->
+		<!-- TESTING                                                           -->
+		<!-- ================================================================= -->
+
+		<!-- Significance: Provides JUnit, Mockito, and Spring Test context to verify your application works before deploying. Scope is 'test' so it isn't included in the final build. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+
+	</dependencies>
+
+	<build>
+		<plugins>
+			<!-- ============================================================== -->
+			<!-- SPRING BOOT MAVEN PLUGIN                                       -->
+			<!-- Significance: Packages your entire application and all of its  -->
+			<!-- dependencies into a single, executable "fat" JAR file.         -->
+			<!-- ============================================================== -->
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+
+			<!-- ============================================================== -->
+			<!-- AVRO MAVEN PLUGIN                                              -->
+			<!-- Significance: During the 'compile' phase, this plugin searches -->
+			<!-- your project for Avro schema files (.avsc). It reads them and  -->
+			<!-- automatically generates exact, strongly-typed Java classes     -->
+			<!-- (like EmployeeCdcEvent.java) so you don't have to write them.  -->
+			<!-- ============================================================== -->
+			<plugin>
+				<groupId>org.apache.avro</groupId>
+				<artifactId>avro-maven-plugin</artifactId>
+				<version>${avro.version}</version>
+				<executions>
+					<execution>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>schema</goal>
+						</goals>
+						<configuration>
+							<!-- Where it looks for your raw schema files -->
+							<sourceDirectory>${project.basedir}/src/main/resources/avro/</sourceDirectory>
+							<!-- Where it outputs the generated Java code -->
+							<outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
+							<stringType>String</stringType>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

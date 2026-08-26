@@ -1,0 +1,72 @@
+spring:
+  application:
+    # Significance: The unique name of your microservice. Used by Spring Cloud,
+    # logging frameworks, and service discovery to identify this specific application.
+    name: poc
+
+  # Enable Java 21 Virtual Threads for high-performance I/O (Kafka, Ollama, DB)
+  threads:
+    virtual:
+      enabled: true
+
+  # PostgreSQL Database & JPA Configuration
+  datasource:
+    # Significance: The JDBC connection string pointing to your local PostgreSQL instance and database.
+    url: jdbc:postgresql://localhost:5432/vectordb
+    # Significance: Database username for authentication.
+    username: postgres
+    # Significance: Database password for authentication.
+    password: password123
+    # Significance: The physical Java driver class used to communicate with PostgreSQL.
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # Significance: Tells Hibernate to automatically update or create database schema tables
+      # to match your JPA entities on startup (ideal for development and POCs).
+      ddl-auto: update
+    # Significance: Prints generated SQL statements to your console for debugging and monitoring.
+    show-sql: true
+    properties:
+      hibernate:
+        # Significance: Formats the printed SQL statements onto multiple, human-readable lines.
+        format_sql: true
+
+  # Apache Kafka Consumer Configuration
+  spring:
+    kafka:
+      bootstrap-servers: localhost:9092
+      consumer:
+        group-id: ai-compliance-group
+        auto-offset-reset: earliest
+
+        # Deserializers defined globally
+        key-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+        value-deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+
+        # Native Confluent properties nested cleanly here
+        properties:
+          schema.registry.url: http://localhost:8081
+          specific.avro.reader: true
+
+
+  # Spring AI Configuration for Local Ollama & PGVector
+  ai:
+    ollama:
+      # Significance: The base network URL where your local Ollama instance is hosting LLM models.
+      base-url: http://localhost:11434
+      chat:
+        options:
+          # Significance: Specifies the exact local language model name used by your OrchestratorAgent for reasoning.
+          model: llama3.2:1b
+      embedding:
+        # Significance: Specifies the model used to convert text into vector embeddings (arrays of numbers) for RAG and semantic search.
+        model: nomic-embed-text
+    vectorstore:
+      pgvector:
+        # Significance: Automatically creates the vector storage tables and extension hooks inside your PostgreSQL database if they don't exist.
+        initialize-schema: true
+        # Significance: The mathematical formula used by pgvector to measure similarity between text vectors during searches.
+        distance-type: COSINE_DISTANCE
+        # Significance: The exact vector length output size produced by your embedding model (nomic-embed-text outputs 768 dimensions).
+        dimensions: 768
