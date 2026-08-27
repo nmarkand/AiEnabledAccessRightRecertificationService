@@ -3,54 +3,386 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome</title>
+    <title>Spring AI - Compliance Audit Report</title>
+    <!-- Marked.js library to convert LLM markdown/backticks into clean HTML -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success-bg: #ecfdf5;
+            --success-text: #065f46;
+            --success-border: #a7f3d0;
+            --danger-bg: #fef2f2;
+            --danger-text: #991b1b;
+            --danger-border: #fca5a5;
+            --info-bg: #f0f9ff;
+            --info-border: #bae6fd;
+            --border-color: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
             margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            color: #333;
+            min-height: 100vh;
+            padding: 20px;
         }
-        .welcome-container {
-            text-align: center;
-            background: #ffffff;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            color: #007bff;
-            margin-bottom: 10px;
-        }
-        p {
-            color: #666;
+
+        /* Top Search Bar */
+        .search-container {
+            width: 100%;
+            max-width: 680px;
+            display: flex;
+            gap: 12px;
             margin-bottom: 20px;
         }
+
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-size: 1rem;
+            outline: none;
+            background: #ffffff;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+        }
+
+        /* Report Card Styling */
+        .report-card {
+            background: var(--card-bg);
+            width: 100%;
+            max-width: 680px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: none; /* Hidden until search is triggered */
+        }
+
+        .card-header {
+            padding: 24px 32px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #ffffff;
+        }
+
+        .card-header h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.02em;
+        }
+
+        .badge-system {
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            text-transform: uppercase;
+        }
+
+        .card-body {
+            padding: 32px;
+        }
+
+        /* Dynamic Status Banner */
+        .status-box {
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .status-box.compliant {
+            background-color: var(--success-bg);
+            border: 1px solid var(--success-border);
+        }
+
+        .status-box.non-compliant {
+            background-color: var(--danger-bg);
+            border: 1px solid var(--danger-border);
+        }
+
+        .status-badge {
+            color: #ffffff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+
+        .status-badge.compliant { background-color: #059669; }
+        .status-badge.non-compliant { background-color: #dc2626; }
+        .status-badge.loading { background-color: #475569; }
+
+        .status-message {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+
+        .status-box.compliant .status-message { color: var(--success-text); }
+        .status-box.non-compliant .status-message { color: var(--danger-text); }
+
+        /* Recommendation Section */
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        .info-card {
+            background-color: var(--info-bg);
+            border-left: 4px solid var(--primary);
+            padding: 16px 20px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .info-card p, .info-card div {
+            font-size: 0.95rem;
+            color: #0369a1;
+        }
+
+        /* Checklist / Highlights */
+        .policy-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .policy-list li {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            position: relative;
+            padding-left: 28px;
+        }
+
+        .policy-list li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 20px;
+            height: 20px;
+            background: #dbeafe;
+            color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        /* Code highlight formatting from backticks */
+        code {
+            background-color: #e2e8f0;
+            color: #1e293b;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.88em;
+        }
+
+        /* Footer & Actions */
+        .card-footer {
+            padding: 20px 32px;
+            background-color: #f8fafc;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-note {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
         .btn {
-            display: inline-block;
-            background-color: #007bff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary);
             color: white;
             padding: 10px 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
             text-decoration: none;
-            border-radius: 4px;
-            transition: background-color 0.3s ease;
+            border-radius: 6px;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            border: none;
+            cursor: pointer;
         }
-        .btn:hover {
-            background-color: #0056b3;
-        }
+
+        .btn:hover { background-color: var(--primary-hover); }
+        .btn:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
 
-<div class="welcome-container">
-    <h1>Welcome to Springboot 4 and Spring AI POC</h1>
-    <p>We are thrilled to have you here. Get started by exploring your dashboard.</p>
-    <a href="#" class="btn">Get Started</a>
+<!-- Integrated Search Bar -->
+<div class="search-container">
+    <input type="text" id="empIdInput" class="search-input" placeholder="Enter Employee ID (e.g., EMP101, EMP102)">
+    <button class="btn" id="auditBtn" onclick="runAudit()">Run Audit</button>
 </div>
+
+<!-- Dynamic Card -->
+<div class="report-card" id="reportCard">
+    <div class="card-header">
+        <h1>AI Compliance Audit Report</h1>
+        <span class="badge-system">Spring AI 2.0</span>
+    </div>
+
+    <div class="card-body">
+        <!-- Status Banner -->
+        <div class="status-box compliant" id="statusBox">
+            <span class="status-badge compliant" id="statusBadge">COMPLIANT</span>
+            <div class="status-message" id="statusMessage">
+                Processing query...
+            </div>
+        </div>
+
+        <!-- Section 1: Detailed Findings / Context -->
+        <h2 class="section-title">Audit Overview</h2>
+        <div class="info-card" id="infoCard">
+            <p>Analyzing policy documents in vector store...</p>
+        </div>
+
+        <!-- Section 2: Key Points Checkmarks -->
+        <h2 class="section-title">Key Audit Observations</h2>
+        <ul class="policy-list" id="policyList">
+            <!-- Dynamic <li> items generated here -->
+        </ul>
+    </div>
+
+    <div class="card-footer">
+        <span class="footer-note">Generated strictly via RAG Context</span>
+        <button class="btn" onclick="runAudit()">Re-run Audit</button>
+    </div>
+</div>
+
+<script>
+    async function runAudit() {
+        const empIdInput = document.getElementById('empIdInput');
+        const empId = empIdInput.value.trim();
+        if (!empId) {
+            alert('Please enter an Employee ID');
+            return;
+        }
+
+        const reportCard = document.getElementById('reportCard');
+        const statusBox = document.getElementById('statusBox');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusMessage = document.getElementById('statusMessage');
+        const infoCard = document.getElementById('infoCard');
+        const policyList = document.getElementById('policyList');
+        const auditBtn = document.getElementById('auditBtn');
+
+        // Show UI Card & Set Loading State
+        reportCard.style.display = 'block';
+        statusBox.className = 'status-box compliant';
+        statusBadge.className = 'status-badge loading';
+        statusBadge.innerText = 'ANALYZING';
+        statusMessage.innerHTML = `Auditing employee <strong>${empId}</strong> against organizational policies...`;
+        infoCard.innerHTML = '<p>Querying Postgres pgvector and processing response through Ollama...</p>';
+        policyList.innerHTML = '<li>Evaluating Segregation of Duties (SoD) and access lifecycles...</li>';
+        auditBtn.disabled = true;
+
+        try {
+            const response = await fetch(`/audit?employeeId=${encodeURIComponent(empId)}`);
+            const rawText = await response.text();
+
+            // 1. Detect Compliance Status
+            const isNonCompliant = rawText.toUpperCase().includes("NOT COMPLIANT") ||
+                rawText.toUpperCase().includes("NON-COMPLIANT") ||
+                rawText.toUpperCase().includes("VIOLATION");
+
+            if (isNonCompliant) {
+                statusBox.className = 'status-box non-compliant';
+                statusBadge.className = 'status-badge non-compliant';
+                statusBadge.innerText = 'NON-COMPLIANT';
+            } else {
+                statusBox.className = 'status-box compliant';
+                statusBadge.className = 'status-badge compliant';
+                statusBadge.innerText = 'COMPLIANT';
+            }
+
+            // 2. Parse & Format Content into Components
+            const lines = rawText.split('\n').filter(line => line.trim() !== '');
+
+            // Set Status Message (First paragraph or summary)
+            statusMessage.innerHTML = marked.parseInline(lines[0] || `Audit complete for ${empId}.`);
+
+            // Populate Overview Info Box (Middle paragraphs)
+            const middleText = lines.slice(1, 3).join('\n\n');
+            infoCard.innerHTML = middleText ? marked.parse(middleText) : `<p>Full policy assessment completed for <strong>${empId}</strong>.</p>`;
+
+            // Extract bullet points or remaining text into Checkmark List
+            policyList.innerHTML = '';
+            const remainingLines = lines.slice(3).length > 0 ? lines.slice(3) : lines;
+
+            remainingLines.forEach(line => {
+                const cleanLine = line.replace(/^[*\-\d.]+\s*/, '').trim();
+                if (cleanLine && !cleanLine.startsWith('=')) {
+                    const li = document.createElement('li');
+                    li.innerHTML = marked.parseInline(cleanLine);
+                    policyList.appendChild(li);
+                }
+            });
+
+            if (policyList.children.length === 0) {
+                const li = document.createElement('li');
+                li.innerHTML = `No additional policy conflicts found for <strong>${empId}</strong>.`;
+                policyList.appendChild(li);
+            }
+
+        } catch (err) {
+            statusBox.className = 'status-box non-compliant';
+            statusBadge.className = 'status-badge non-compliant';
+            statusBadge.innerText = 'ERROR';
+            statusMessage.innerText = 'Failed to execute audit.';
+            infoCard.innerHTML = `<p style="color: var(--danger-text);">Network/Server Error: ${err.message}</p>`;
+        } finally {
+            auditBtn.disabled = false;
+        }
+    }
+</script>
 
 </body>
 </html>

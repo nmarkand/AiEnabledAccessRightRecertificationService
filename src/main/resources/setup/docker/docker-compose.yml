@@ -6,7 +6,7 @@ services:
   # ==============================================================================
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: springboot-ai-poc-kafka
+    container_name: recertification-poc-kafka
     hostname: kafka
     ports:
       - "9092:9092"
@@ -49,7 +49,7 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - springboot-ai-poc-application-network
+      - recertification-poc-application-network
 
   # ==============================================================================
   # 2. Kafka Registry
@@ -57,7 +57,7 @@ services:
   # ==============================================================================
   schema-registry:
     image: confluentinc/cp-schema-registry:7.5.0
-    container_name: springboot-ai-poc-schema-registry
+    container_name: recertification-poc-schema-registry
     ports:
       - "8081:8081"
     environment:
@@ -68,7 +68,7 @@ services:
       kafka:
         condition: service_healthy # Ensures Schema Registry waits until Kafka is fully healthy before starting
     networks:
-      - springboot-ai-poc-application-network
+      - recertification-poc-application-network
 
   # ==============================================================================
   # 2. Kafka UI (Observability Dashboard)
@@ -76,7 +76,7 @@ services:
   # ==============================================================================
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
-    container_name: springboot-ai-poc-kafka-ui
+    container_name: recertification-poc-kafka-ui
     ports:
       - "8090:8080" # Access via http://localhost:8090
     environment:
@@ -87,7 +87,7 @@ services:
     depends_on:
       - kafka
     networks:
-      - springboot-ai-poc-application-network
+      - recertification-poc-application-network
 
   # ==============================================================================
   # 3. Debezium Kafka Connect (Change Data Capture)
@@ -96,7 +96,7 @@ services:
   # ==============================================================================
   debezium-connect:
     build: .
-    container_name: springboot-ai-poc-debezium-connect
+    container_name: recertification-poc-debezium-connect
     hostname: kafka-connect
     ports:
       - "8083:8083"
@@ -127,7 +127,7 @@ services:
       schema-registry:
         condition: service_started
     networks:
-      - springboot-ai-poc-application-network
+      - recertification-poc-application-network
 
   # ==============================================================================
   # 4. PostgreSQL (Relational Data + Vector Store)
@@ -136,7 +136,7 @@ services:
   # ==============================================================================
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: springboot-ai-poc-postgres-vector-db
+    container_name: recertification-poc-postgres-vector-db
     hostname: postgres
     ports:
       - "5432:5432"
@@ -150,7 +150,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data # Persists database data across container restarts
     networks:
-      - springboot-ai-poc-application-network
+      - recertification-poc-application-network
 
   # ==============================================================================
   # 5. pgAdmin (Database Dashboard)
@@ -158,7 +158,7 @@ services:
   # ==============================================================================
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: springboot-ai-poc-pgadmin-for-postgres-sql
+    container_name: recertification-poc-pgadmin-for-postgres-sql
     ports:
       - "5050:80" # Access via http://localhost:5050
     environment:
@@ -169,7 +169,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - springboot-ai-poc-application-network
+      - recertification-poc-application-network
 
   # ==============================================================================
   # 6. Ollama (Local AI Engine)
@@ -178,13 +178,13 @@ services:
   # ==============================================================================
   ollama:
     image: ollama/ollama:latest
-    container_name: springboot-ai-poc-ollama
+    container_name: recertification-poc-ollama
     ports:
       - "11434:11434" # API port used by Spring AI to send prompts to the LLM
     volumes:
       - ollama_data:/root/.ollama # Persists downloaded LLM models so you don't re-download them
     networks:
-      - springboot-ai-poc-application-network
+      - recertification-poc-application-network
 
   # ==============================================================================
   # 7. Open WebUI (Chat Interface for Ollama)
@@ -192,7 +192,7 @@ services:
   # ==============================================================================
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
-    container_name: springboot-ai-poc-open-webui-for-ollama
+    container_name: recertification-poc-open-webui-for-ollama
     ports:
       - "3000:8080" # Access via http://localhost:3000
     environment:
@@ -202,7 +202,7 @@ services:
     depends_on:
       - ollama
     networks:
-      - springboot-ai-poc-application-network
+      - recertification-poc-application-network
 
 volumes:
   pgdata:
@@ -211,7 +211,7 @@ volumes:
   open-webui_data:
 
 networks:
-  springboot-ai-poc-application-network:
+  recertification-poc-application-network:
     driver: bridge # Default bridge network so containers can resolve each other by hostname
 
 # Llama 3 is just a raw model—not an executable application with its own Docker image.
@@ -219,7 +219,7 @@ networks:
 # It is ollama which pulls and executes LLMs hence no llama3 image available for docker
 
 # So EITHER USE following command to run ollama and ollama pull llama3.2:1b (ultra light weight llm)
-# docker exec -it springboot-ai-poc-ollama ollama pull llama3.2:1b
+# docker exec -it recertification-poc-ollama ollama pull llama3.2:1b
 
                   # OR
 
